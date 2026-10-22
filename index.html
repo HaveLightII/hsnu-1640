@@ -123,44 +123,40 @@
     padding: 20px 0;
   }
 
-  .matter-table-wrap {
-    margin-top: 24px;
-    overflow-x: auto;
-    background: #fff;
-    border: 1px solid var(--rule);
+  #matterList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
-  .matter-table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-  }
-
-  .matter-table th,
-  .matter-table td {
-    padding: 12px 16px;
+  #matterList li {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    gap: 4px 20px;
+    padding: 20px 0;
     border-bottom: 1px solid var(--rule);
   }
 
-  .matter-table th {
-    font-family: "Noto Serif TC", serif;
-    font-weight: 500;
-    white-space: nowrap;
+  #matterList .matter-item {
+    font-weight: 700;
+    grid-column: 2;
   }
 
-  .matter-table tbody tr:last-child td { border-bottom: 0; }
+  #matterList .matter-link {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
 
-  .matter-table .matter-date { white-space: nowrap; }
-
-  .matter-table a {
+  #matterList a {
     color: var(--ink);
     text-decoration-color: var(--gold);
     text-underline-offset: 3px;
   }
 
-  .matter-table .empty-row {
+  #matterList .status-msg {
     color: var(--muted);
-    text-align: center;
+    padding: 20px 0;
   }
 
   .calendar-wrap {
@@ -274,16 +270,9 @@
 
   <section>
     <h2>近期事項</h2>
-    <div class="matter-table-wrap">
-      <table class="matter-table">
-        <thead>
-          <tr><th scope="col">截止日</th><th scope="col">事項</th><th scope="col">連結</th></tr>
-        </thead>
-        <tbody id="matterList">
-          <tr><td class="empty-row" colspan="3">讀取中…</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <ul id="matterList">
+      <li class="status-msg">讀取中…</li>
+    </ul>
   </section>
 
   <section>
@@ -454,26 +443,33 @@
       .sort((a, b) => a.date.localeCompare(b.date));
 
     if (upcoming.length === 0) {
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.className = "empty-row";
-      td.colSpan = 3;
-      td.textContent = "目前沒有近期事項";
-      tr.appendChild(td);
-      list.appendChild(tr);
+      const li = document.createElement("li");
+      li.className = "status-msg";
+      li.textContent = "目前沒有近期事項";
+      list.appendChild(li);
       return;
     }
 
     upcoming.forEach(row => {
-      const tr = document.createElement("tr");
-      const dateCell = document.createElement("td");
-      dateCell.className = "matter-date";
-      dateCell.textContent = row.date;
+      const li = document.createElement("li");
+      const dateCell = document.createElement("div");
+      dateCell.className = "exam-date";
+      const date = new Date(`${row.date}T00:00:00`);
+      const weekday = isNaN(date) ? "" : weekdayNames[date.getDay()];
+      dateCell.append(document.createTextNode(row.date));
+      if (weekday) {
+        const weekdayCell = document.createElement("span");
+        weekdayCell.className = "exam-weekday";
+        weekdayCell.textContent = `週${weekday}`;
+        dateCell.appendChild(weekdayCell);
+      }
 
-      const itemCell = document.createElement("td");
+      const itemCell = document.createElement("div");
+      itemCell.className = "matter-item";
       itemCell.textContent = row.item || row.range || "";
 
-      const linkCell = document.createElement("td");
+      const linkCell = document.createElement("div");
+      linkCell.className = "matter-link";
       const linkText = row.link || "";
       if (linkText) {
         try {
@@ -483,15 +479,15 @@
             anchor.href = url.href;
             anchor.target = "_blank";
             anchor.rel = "noopener";
-            anchor.textContent = "開啟連結";
+            anchor.textContent = "相關連結";
             linkCell.appendChild(anchor);
           }
         } catch (_) {}
       }
-      if (!linkCell.childNodes.length) linkCell.textContent = "—";
+      if (!linkCell.childNodes.length) linkCell.textContent = "";
 
-      tr.append(dateCell, itemCell, linkCell);
-      list.appendChild(tr);
+      li.append(dateCell, itemCell, linkCell);
+      list.appendChild(li);
     });
   }
 
