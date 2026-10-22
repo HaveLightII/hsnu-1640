@@ -437,12 +437,11 @@
     label.className = "notice-label";
     label.textContent = "近期重要事項";
     bar.appendChild(label);
-    upcoming.forEach(row => {
-      const item = document.createElement("span");
-      item.className = "notice-item";
-      item.textContent = `${row.date} ${row.item || row.range || ""}`;
-      bar.appendChild(item);
-    });
+    const first = upcoming[0];
+    const item = document.createElement("span");
+    item.className = "notice-item";
+    item.textContent = `${first.date} ${first.item || first.range || ""}`;
+    bar.appendChild(item);
     bar.style.display = "block";
   }
 
