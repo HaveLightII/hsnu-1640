@@ -123,6 +123,46 @@
     padding: 20px 0;
   }
 
+  .matter-table-wrap {
+    margin-top: 24px;
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid var(--rule);
+  }
+
+  .matter-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+  }
+
+  .matter-table th,
+  .matter-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .matter-table th {
+    font-family: "Noto Serif TC", serif;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .matter-table tbody tr:last-child td { border-bottom: 0; }
+
+  .matter-table .matter-date { white-space: nowrap; }
+
+  .matter-table a {
+    color: var(--ink);
+    text-decoration-color: var(--gold);
+    text-underline-offset: 3px;
+  }
+
+  .matter-table .empty-row {
+    color: var(--muted);
+    text-align: center;
+  }
+
   .calendar-wrap {
     margin-top: 24px;
     border: 1px solid var(--rule);
@@ -233,6 +273,20 @@
   </section>
 
   <section>
+    <h2>近期事項</h2>
+    <div class="matter-table-wrap">
+      <table class="matter-table">
+        <thead>
+          <tr><th scope="col">截止日</th><th scope="col">事項</th><th scope="col">連結</th></tr>
+        </thead>
+        <tbody id="matterList">
+          <tr><td class="empty-row" colspan="3">讀取中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
     <h2>常用連結</h2>
     <div class="quick-links">
       <a class="quick-link" href="https://docs.google.com/spreadsheets/d/1Qfgs-Q1xZXFvOItKbJ9XCMxUvvyvPaOqbvj2-_CK7-E/edit?usp=sharing" target="_blank" rel="noopener">
@@ -279,26 +333,60 @@
 <script>
   const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
 
+  function todayString() {
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 10);
+  }
+
   function parseCsv(text) {
-    const lines = text.trim().split(/\r?\n/);
-    const header = lines.shift().split(",").map(h => h.trim());
-    return lines
-      .filter(line => line.trim().length > 0)
-      .map(line => {
-        const cells = line.split(",");
-        const row = {};
-        header.forEach((key, i) => {
-          row[key] = (cells[i] ?? "").trim();
-        });
-        return row;
-      });
+    const records = [];
+    let record = [];
+    let cell = "";
+    let quoted = false;
+
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      if (quoted) {
+        if (char === '"' && text[i + 1] === '"') {
+          cell += '"';
+          i += 1;
+        } else if (char === '"') {
+          quoted = false;
+        } else {
+          cell += char;
+        }
+      } else if (char === '"') {
+        quoted = true;
+      } else if (char === ",") {
+        record.push(cell.trim());
+        cell = "";
+      } else if (char === "\n" || char === "\r") {
+        if (char === "\r" && text[i + 1] === "\n") i += 1;
+        record.push(cell.trim());
+        if (record.some(value => value !== "")) records.push(record);
+        record = [];
+        cell = "";
+      } else {
+        cell += char;
+      }
+    }
+    record.push(cell.trim());
+    if (record.some(value => value !== "")) records.push(record);
+
+    const header = (records.shift() || []).map(value => value.trim());
+    return records.map(cells => {
+      const row = {};
+      header.forEach((key, i) => { row[key] = cells[i] ?? ""; });
+      return row;
+    });
   }
 
   function renderExams(rows) {
     const list = document.getElementById("examList");
     list.innerHTML = "";
 
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayString();
 
     const valid = rows
       .filter(r => r.date)
@@ -333,20 +421,79 @@
 
   function renderNotice(rows) {
     const bar = document.getElementById("noticeBar");
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayString();
 
     const upcoming = rows
       .filter(r => r.date && r.date >= todayStr)
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    if (upcoming.length === 0) return;
+    if (upcoming.length === 0) {
+      bar.style.display = "none";
+      return;
+    }
 
-    const items = upcoming
-      .map(r => `<span class="notice-item">${r.date} ${r.range || ""}</span>`)
-      .join("");
-
-    bar.innerHTML = `<span class="notice-label">近期重要事項</span>${items}`;
+    bar.replaceChildren();
+    const label = document.createElement("span");
+    label.className = "notice-label";
+    label.textContent = "近期重要事項";
+    bar.appendChild(label);
+    upcoming.forEach(row => {
+      const item = document.createElement("span");
+      item.className = "notice-item";
+      item.textContent = `${row.date} ${row.item || row.range || ""}`;
+      bar.appendChild(item);
+    });
     bar.style.display = "block";
+  }
+
+  function renderMatters(rows) {
+    const list = document.getElementById("matterList");
+    list.replaceChildren();
+
+    const upcoming = rows
+      .filter(row => row.date && row.date >= todayString())
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (upcoming.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.className = "empty-row";
+      td.colSpan = 3;
+      td.textContent = "目前沒有近期事項";
+      tr.appendChild(td);
+      list.appendChild(tr);
+      return;
+    }
+
+    upcoming.forEach(row => {
+      const tr = document.createElement("tr");
+      const dateCell = document.createElement("td");
+      dateCell.className = "matter-date";
+      dateCell.textContent = row.date;
+
+      const itemCell = document.createElement("td");
+      itemCell.textContent = row.item || row.range || "";
+
+      const linkCell = document.createElement("td");
+      const linkText = row.link || "";
+      if (linkText) {
+        try {
+          const url = new URL(linkText);
+          if (url.protocol === "https:" || url.protocol === "http:") {
+            const anchor = document.createElement("a");
+            anchor.href = url.href;
+            anchor.target = "_blank";
+            anchor.rel = "noopener";
+            anchor.textContent = "開啟連結";
+            linkCell.appendChild(anchor);
+          }
+        } catch (_) {}
+      }
+      if (!linkCell.childNodes.length) linkCell.textContent = "—";
+
+      tr.append(dateCell, itemCell, linkCell);
+      list.appendChild(tr);
+    });
   }
 
   fetch("calender.csv", { cache: "no-store" })
@@ -362,8 +509,14 @@
 
   fetch("important.csv", { cache: "no-store" })
     .then(res => (res.ok ? res.text() : ""))
-    .then(text => text && renderNotice(parseCsv(text)))
-    .catch(() => {});
+    .then(text => {
+      const rows = text ? parseCsv(text) : [];
+      renderNotice(rows);
+      renderMatters(rows);
+    })
+    .catch(() => {
+      renderMatters([]);
+    });
 </script>
 </body>
 </html>
