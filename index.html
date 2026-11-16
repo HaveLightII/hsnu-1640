@@ -4,6 +4,43 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小考日程表</title>
+<script id="theme-init">
+  window.classBoardTheme = (() => {
+    const storageKey = "classBoardTheme";
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    let preference = null;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved === "light" || saved === "dark") preference = saved;
+    } catch (_) {}
+
+    function refresh() {
+      const theme = preference || (systemTheme.matches ? "dark" : "light");
+      document.documentElement.dataset.theme = theme;
+      const button = document.getElementById("themeToggle");
+      if (button) {
+        button.hidden = false;
+        button.setAttribute("aria-pressed", String(theme === "dark"));
+        button.title = theme === "dark" ? "切換為淺色模式" : "切換為深色模式";
+      }
+    }
+
+    function toggle() {
+      preference = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      try { localStorage.setItem(storageKey, preference); } catch (_) {}
+      refresh();
+    }
+
+    refresh();
+    if (systemTheme.addEventListener) systemTheme.addEventListener("change", refresh);
+    window.addEventListener("storage", event => {
+      if (event.key !== storageKey && event.key !== null) return;
+      preference = event.newValue === "light" || event.newValue === "dark" ? event.newValue : null;
+      refresh();
+    });
+    return { refresh, toggle };
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -15,9 +52,70 @@
     --soon: #c1502e;
     --done: #6b8f71;
     --muted: #6b6558;
+    --surface: #ffffff;
+    --notice: #fbf1da;
+    --focus: #815e0d;
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #eee9de;
+    --paper: #151a22;
+    --surface: #1e2632;
+    --rule: #414958;
+    --gold: #d7b66e;
+    --soon: #f2a183;
+    --done: #a2c3a4;
+    --muted: #b7b4ad;
+    --notice: #302a20;
+    --focus: #e7c884;
+    color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .title-row h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    margin: 0;
+  }
+
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .theme-toggle[hidden] { display: none; }
+  .theme-toggle:hover { border-color: var(--gold); }
+  .theme-toggle[aria-pressed="true"] {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .theme-toggle svg { width: 18px; height: 18px; }
+  a:focus-visible, button:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 4px;
+  }
 
   body {
     margin: 0;
@@ -162,7 +260,7 @@
   .calendar-wrap {
     margin-top: 24px;
     border: 1px solid var(--rule);
-    background: #fff;
+    background: var(--surface);
   }
 
   .calendar-wrap iframe {
@@ -170,6 +268,8 @@
     width: 100%;
     height: 560px;
     border: 0;
+    color-scheme: light;
+    background: #fff;
   }
 
   .quick-links {
@@ -184,7 +284,7 @@
     align-items: center;
     gap: 14px;
     padding: 14px;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--rule);
     text-decoration: none;
     color: var(--ink);
@@ -201,6 +301,7 @@
     height: 56px;
     flex-shrink: 0;
     border: 1px solid var(--rule);
+    background: #fff;
   }
 
   .quick-link-text {
@@ -220,6 +321,9 @@
   }
 
   @media (max-width: 480px) {
+    .title-row { gap: 10px; }
+    .title-row h1 { font-size: clamp(1.35rem, 5.5vw, 2rem); }
+    .theme-toggle { padding-inline: 10px; }
     .quick-links {
       grid-template-columns: 1fr;
     }
@@ -233,7 +337,7 @@
 
   #noticeBar {
     display: none;
-    background: #fbf1da;
+    background: var(--notice);
     border-top: 1px solid var(--gold);
     border-bottom: 1px solid var(--gold);
     color: var(--ink);
@@ -258,7 +362,15 @@
 <body>
 <div id="noticeBar"></div>
 <main>
-  <h1>小考日程表</h1>
+  <header class="title-row">
+    <h1>小考日程表</h1>
+    <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+        <path d="M20.5 14.4A8.6 8.6 0 0 1 9.6 3.5a8.6 8.6 0 1 0 10.9 10.9Z" />
+      </svg>
+      <span>深色模式</span>
+    </button>
+  </header>
   <p class="subtitle">HSNU 1640 小考日程表</p>
 
   <section>
@@ -294,6 +406,11 @@
 
   <footer>所有內容仍以學校公告為準；日程如有不齊全請私訊我或聯絡 310394@gs.hs.ntnu.edu.tw ；本網頁前端有使用AI工具的協助。</footer>
 </main>
+
+<script id="theme-controls">
+  window.classBoardTheme.refresh();
+  document.getElementById("themeToggle").addEventListener("click", window.classBoardTheme.toggle);
+</script>
 
 <script>
   const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
