@@ -123,13 +123,13 @@
     padding: 20px 0;
   }
 
-  #matterList {
+  .matter-list {
     list-style: none;
     margin: 0;
     padding: 0;
   }
 
-  #matterList li {
+  .matter-list li {
     display: grid;
     grid-template-columns: 88px 1fr;
     gap: 4px 20px;
@@ -137,24 +137,24 @@
     border-bottom: 1px solid var(--rule);
   }
 
-  #matterList .matter-item {
+  .matter-list .matter-item {
     font-weight: 700;
     grid-column: 2;
   }
 
-  #matterList .matter-link {
+  .matter-list .matter-link {
     grid-column: 2;
     color: var(--muted);
     font-size: 0.92rem;
   }
 
-  #matterList a {
+  .matter-list a {
     color: var(--ink);
     text-decoration-color: var(--gold);
     text-underline-offset: 3px;
   }
 
-  #matterList .status-msg {
+  .matter-list .status-msg {
     color: var(--muted);
     padding: 20px 0;
   }
@@ -269,51 +269,27 @@
   </section>
 
   <section>
+    <h2>近期作業</h2>
+    <ul id="homeworkList" class="matter-list">
+      <li class="status-msg">讀取中…</li>
+    </ul>
+  </section>
+
+  <section>
     <h2>近期事項</h2>
-    <ul id="matterList">
+    <ul id="matterList" class="matter-list">
       <li class="status-msg">讀取中…</li>
     </ul>
   </section>
 
   <section>
     <h2>常用連結</h2>
-    <div class="quick-links">
-      <a class="quick-link" href="https://docs.google.com/spreadsheets/d/1Qfgs-Q1xZXFvOItKbJ9XCMxUvvyvPaOqbvj2-_CK7-E/edit?usp=sharing" target="_blank" rel="noopener">
-        <img src="qr/points.png" alt="查詢積分 QR code">
-        <span class="quick-link-text">
-          <span class="quick-link-label">查詢我的積分</span>
-          <span class="quick-link-hint">掃描 QR code 或點擊連結</span>
-        </span>
-      </a>
-      <a class="quick-link" href="https://docs.google.com/spreadsheets/d/1PvEQlh2XYOFbcYxGHvJxVd56lWSA_Cnbxg8rw1LYMsM/edit?usp=sharing" target="_blank" rel="noopener">
-        <img src="qr/attendance.png" alt="確認出席 QR code">
-        <span class="quick-link-text">
-          <span class="quick-link-label">確認出席（9:00 報到）</span>
-          <span class="quick-link-hint">掃描 QR code 或點擊連結</span>
-        </span>
-      </a>
-      <a class="quick-link" href="https://docs.google.com/document/d/11c9enaYtxP38lI158IXoqb64DBojNorKszQW5_gBwtQ/edit?usp=sharing" target="_blank" rel="noopener">
-        <img src="qr/chat.png" alt="與 Marc(還是Mark???) 登記會談 QR code">
-        <span class="quick-link-text">
-          <span class="quick-link-label">與 Mark 登記會談</span>
-          <span class="quick-link-hint">掃描 QR code 或點擊連結</span>
-        </span>
-      </a>
-      <a class="quick-link" href="https://forms.gle/1dxj1hrv1GPtF7J18" target="_blank" rel="noopener">
-        <img src="qr/seating.png" alt="座位偏好調查 QR code">
-        <span class="quick-link-text">
-          <span class="quick-link-label">座位偏好調查</span>
-          <span class="quick-link-hint">掃描 QR code 或點擊連結</span>
-        </span>
-      </a>
-    </div>
+    <div class="quick-links" id="quickLinks"></div>
   </section>
 
   <section>
     <h2>行事曆</h2>
-    <div class="calendar-wrap">
-      <iframe src="https://calendar.google.com/calendar/embed?src=c_e6ceeab77c8cea8863b2e8df34854ce4b8ca0e4a859ad3118ac61e08fa343fdd%40group.calendar.google.com&ctz=Asia%2FTaipei" style="border: 0" width="800" height="600" frameborder="0" scrolling="no"></iframe>
-    </div>
+    <div class="calendar-wrap" id="calendarWrap"></div>
   </section>
 
   <footer>所有內容仍以學校公告為準；日程如有不齊全請私訊我或聯絡 310394@gs.hs.ntnu.edu.tw ；本網頁前端有使用AI工具的協助。</footer>
@@ -328,47 +304,10 @@
     return localDate.toISOString().slice(0, 10);
   }
 
-  function parseCsv(text) {
-    const records = [];
-    let record = [];
-    let cell = "";
-    let quoted = false;
-
-    for (let i = 0; i < text.length; i += 1) {
-      const char = text[i];
-      if (quoted) {
-        if (char === '"' && text[i + 1] === '"') {
-          cell += '"';
-          i += 1;
-        } else if (char === '"') {
-          quoted = false;
-        } else {
-          cell += char;
-        }
-      } else if (char === '"') {
-        quoted = true;
-      } else if (char === ",") {
-        record.push(cell.trim());
-        cell = "";
-      } else if (char === "\n" || char === "\r") {
-        if (char === "\r" && text[i + 1] === "\n") i += 1;
-        record.push(cell.trim());
-        if (record.some(value => value !== "")) records.push(record);
-        record = [];
-        cell = "";
-      } else {
-        cell += char;
-      }
-    }
-    record.push(cell.trim());
-    if (record.some(value => value !== "")) records.push(record);
-
-    const header = (records.shift() || []).map(value => value.trim());
-    return records.map(cells => {
-      const row = {};
-      header.forEach((key, i) => { row[key] = cells[i] ?? ""; });
-      return row;
-    });
+  function escapeHtml(value) {
+    const span = document.createElement("span");
+    span.textContent = value || "";
+    return span.innerHTML;
   }
 
   function renderExams(rows) {
@@ -401,8 +340,8 @@
 
       li.innerHTML = `
         <div class="exam-date">${row.date}<span class="exam-weekday">週${weekday}</span></div>
-        <div class="exam-subject">${row.subject || ""}${isNext ? '<span class="tag">最近</span>' : ""}</div>
-        <div class="exam-range">${row.range || ""}</div>
+        <div class="exam-subject">${escapeHtml(row.subject)}${isNext ? '<span class="tag">最近</span>' : ""}</div>
+        <div class="exam-range">${escapeHtml(row.range)}</div>
       `;
       list.appendChild(li);
     });
@@ -434,8 +373,8 @@
     bar.style.display = "block";
   }
 
-  function renderMatters(rows) {
-    const list = document.getElementById("matterList");
+  function renderMatters(rows, listId = "matterList", label = "事項") {
+    const list = document.getElementById(listId);
     list.replaceChildren();
 
     const upcoming = rows
@@ -445,7 +384,7 @@
     if (upcoming.length === 0) {
       const li = document.createElement("li");
       li.className = "status-msg";
-      li.textContent = "目前沒有近期事項";
+      li.textContent = `目前沒有近期${label}`;
       list.appendChild(li);
       return;
     }
@@ -491,30 +430,89 @@
     });
   }
 
-  fetch("calender.csv", { cache: "no-store" })
-    .then(res => {
-      if (!res.ok) throw new Error("找不到 calender.csv");
-      return res.text();
-    })
-    .then(text => renderExams(parseCsv(text)))
-    .catch(err => {
-      document.getElementById("examList").innerHTML =
-        `<li class="status-msg">讀取 calender.csv 失敗：${err.message}</li>`;
-    });
+  function safeUrl(value) {
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    } catch (_) { return ""; }
+  }
 
-  fetch("important.csv", { cache: "no-store" })
-    .then(res => (res.ok ? res.text() : ""))
-    .then(text => {
-      const rows = text ? parseCsv(text) : [];
-      renderNotice(rows);
-      renderMatters(rows);
+  function renderLinks(rows) {
+    const container = document.getElementById("quickLinks");
+    container.replaceChildren();
+    rows.forEach(row => {
+      const url = safeUrl(row.url);
+      if (!url) return;
+      const anchor = document.createElement("a");
+      anchor.className = "quick-link";
+      anchor.href = url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      if (row.image && (/^qr\/[a-zA-Z0-9_.-]+$/.test(row.image) || safeUrl(row.image))) {
+        const image = document.createElement("img");
+        image.src = row.image;
+        image.alt = `${row.label} QR code`;
+        anchor.appendChild(image);
+      }
+      const text = document.createElement("span");
+      text.className = "quick-link-text";
+      for (const [field, className] of [["label", "quick-link-label"], ["hint", "quick-link-hint"]]) {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = row[field] || "";
+        text.appendChild(span);
+      }
+      anchor.appendChild(text);
+      container.appendChild(anchor);
+    });
+    if (!container.childNodes.length) container.textContent = "目前沒有常用連結";
+  }
+
+  function renderCalendar(calendar) {
+    const container = document.getElementById("calendarWrap");
+    container.replaceChildren();
+    const url = safeUrl(calendar.url);
+    if (!url) {
+      container.textContent = "尚未設定行事曆";
+      return;
+    }
+    const frame = document.createElement("iframe");
+    frame.src = url;
+    frame.title = "班級行事曆";
+    frame.loading = "lazy";
+    container.appendChild(frame);
+  }
+
+  fetch("config.json", { cache: "no-store" })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     })
-    .catch(() => {
-      renderMatters([]);
+    .then(config => {
+      for (const key of ["exams", "homework", "matters", "links"]) {
+        if (!Array.isArray(config[key])) throw new Error(`設定缺少 ${key} 陣列`);
+      }
+      if (!config.calendar || typeof config.calendar.url !== "string") {
+        throw new Error("設定缺少 calendar.url");
+      }
+      renderExams(config.exams);
+      renderMatters(config.homework, "homeworkList", "作業");
+      renderMatters(config.matters);
+      renderNotice(config.matters);
+      renderLinks(config.links);
+      renderCalendar(config.calendar);
+    })
+    .catch(error => {
+      document.getElementById("noticeBar").style.display = "none";
+      for (const id of ["examList", "homeworkList", "matterList", "quickLinks", "calendarWrap"]) {
+        const container = document.getElementById(id);
+        container.replaceChildren();
+        const message = document.createElement(id.endsWith("List") ? "li" : "p");
+        message.className = "status-msg";
+        message.textContent = `讀取 config.json 失敗：${error.message}`;
+        container.appendChild(message);
+      }
     });
 </script>
 </body>
 </html>
-
-
-
