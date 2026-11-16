@@ -1,6 +1,8 @@
-# 師大附中 1640 班公告網頁
+# 班級公告網站模板與管理資源
 
-提供師大附中 1640 班查看近期小考、作業、事項、常用連結與行事曆的靜態網站。管理者可透過 Python 程式維護公告內容，並以 GitHub Pages 發佈。  
+本專案提供可自行架設的班級公告網站模板，以及維護小考、作業、事項、常用連結與行事曆的管理工具。適合希望建立班級公告網站，並透過命令列或互動選單管理內容的使用者。  
+
+目前 `main` 分支用於師大附中 1640 班的公告，內含該班的設定與網站識別。其他使用者可 clone 專案、初始化資料，再修改班級名稱與聯絡資訊，建立自己的公告網站。  
 
 ## 功能（Features）
 
@@ -21,21 +23,51 @@
 | 前端邏輯測試 | Node.js 18 以上；不影響網站或管理工具執行 |
 | 網站託管 | GitHub Pages 或其他靜態網站服務 |
 
-## 本機執行（Run Locally）
+## 開始使用（Installation）
 
-準備 Git 與 Python 3.9 以上，取得專案後啟動本機預覽：  
+準備 Git 與 Python 3.9 以上。管理工具僅使用 Python 標準函式庫，不需要安裝額外 Python 套件。  
+
+### 取得模板並初始化
 
 ```bash
-git clone https://github.com/havelightii/hsnu-1640.git
-cd hsnu-1640
+git clone https://github.com/havelightii/hsnu-1640.git my-class-board
+cd my-class-board
+python3 manager.py init --yes
+python3 manager.py
+```
+
+- 1：將專案複製至自己的 `my-class-board` 資料夾；可自行更改資料夾名稱。  
+- 2：進入專案目錄。  
+- 3：備份並清空複製過來的小考、作業、事項、常用連結與行事曆設定，將自動清理模式設為 `never`。  
+- 4：開啟管理選單，加入自己班級的內容，完成後選擇「儲存並離開」。  
+
+初始化只影響本機這份專案，不會修改來源儲存庫。請在新複製的模板中執行；已有自用資料時，初始化也會清空那些資料。  
+
+### 修改班級識別與素材
+
+初始化不會修改 `index.html` 的固定文字，也不會刪除圖片。首次使用請自行調整：  
+
+| 位置 | 要修改的內容 |
+| --- | --- |
+| `index.html` 的 `<title>` | 瀏覽器分頁標題 |
+| `index.html` 的 `<h1>` 與 `.subtitle` | 網站名稱、學校與班級名稱 |
+| `index.html` 的 `<footer>` | 公告說明與自己的聯絡資訊 |
+| `qr/` | 更換或移除不屬於自己班級的 QR 圖片 |
+| 管理工具的「常用連結」與「行事曆」 | 填入自己的網址、圖片路徑與行事曆嵌入網址 |
+
+需要調整外觀時，可編輯 `index.html` 中的 CSS。班級識別與頁面外觀目前不由 `manager.py` 管理。  
+
+## 本機預覽（Run Locally）
+
+在自己的專案目錄執行：  
+
+```bash
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-- 1：複製專案。  
-- 2：進入專案資料夾。  
-- 3：啟動預覽伺服器；以 Ctrl+C 停止。  
+- 1：啟動本機預覽伺服器；以 Ctrl+C 停止。  
 
-瀏覽器開啟 [本機預覽](http://localhost:8000)。請透過 HTTP 預覽，不要直接以檔案方式開啟 `index.html`。已有專案者直接在專案目錄啟動伺服器即可。  
+瀏覽器開啟 [本機預覽](http://localhost:8000)，確認公告、班級名稱、聯絡資訊、連結及行事曆都符合自己的需求。請透過 HTTP 預覽，不要直接以檔案方式開啟 `index.html`。  
 
 ## 設定說明（Documentation）
 
@@ -80,7 +112,7 @@ python3 manager.py
 
 ### 命令列操作
 
-以下範例會實際修改設定；請依需求選擇執行，不必全部執行。引數模式的成功修改會立即儲存。編號從 1 開始，依設定檔順序排列；刪除或自動清理後可能改變，請先重新列出。網頁顯示則會依日期排序。  
+以下日期、內容及網址為操作範例，請換成自己班級的資料。指令會實際修改設定，依需求選擇執行即可。引數模式的成功修改會立即儲存。編號從 1 開始，依設定檔順序排列；刪除或自動清理後可能改變，請先重新列出。網頁顯示則會依日期排序。  
 
 ### 小考
 
@@ -118,7 +150,7 @@ python3 manager.py matters add --date 2026-12-04 --item "繳交回條"
 
 ```bash
 python3 manager.py links list
-python3 manager.py links add --label "學校首頁" --url "https://www.hs.ntnu.edu.tw/" --hint "開啟學校網站"
+python3 manager.py links add --label "學校首頁" --url "https://example.com/" --hint "開啟學校網站"
 python3 manager.py links edit 1 --label "積分查詢" --image "qr/points.png"
 python3 manager.py links delete 1
 ```
@@ -218,13 +250,35 @@ node tests/test_frontend.cjs
 - 1：執行 Python 測試，涵蓋資料操作、行事曆、輸入驗證、互動取消、初始化備份與自動清理；測試使用暫存設定，不會修改正式資料。  
 - 2：執行前端邏輯測試，涵蓋區塊順序、資料渲染、連結、文字跳脫、空資料及載入錯誤；需要 Node.js 18 以上。  
 
-前端測試使用 DOM 替身，不包含實際瀏覽器排版、QR 圖片內容或外部行事曆的可用性檢查。這些項目請透過本機預覽確認。  
+前端測試部分斷言依來源專案的資料數量設定；初始化或客製化資料後，需依自己的測試資料調整斷言。測試使用 DOM 替身，不包含實際瀏覽器排版、QR 圖片內容或外部行事曆的可用性檢查。這些項目請透過本機預覽確認。  
 
-## 發佈（Deployment）
+## 發佈自己的網站（Deployment）
 
-此專案不需要建置程序，可由靜態網站服務提供 `index.html`、`config.json` 與 `qr/`。GitHub Pages 請使用儲存庫實際設定的發佈來源。  
+此專案不需要建置程序，可由靜態網站服務提供 `index.html`、`config.json` 與 `qr/`。請將客製化結果放在自己的儲存庫，並依所選服務設定網站發佈來源。  
 
-日常管理完成後，將設定提交並推送：  
+### 設定自己的遠端儲存庫
+
+clone 後的 `origin` 仍指向來源專案。請先在自己的 GitHub 帳號建立空白儲存庫，再將下列 `YOUR_ACCOUNT` 與 `YOUR_REPOSITORY` 換成自己的帳號及儲存庫名稱：  
+
+```bash
+git remote set-url origin https://github.com/YOUR_ACCOUNT/YOUR_REPOSITORY.git
+git remote -v
+git add index.html config.json qr/
+git commit -m "設定班級公告網站"
+git push -u origin HEAD
+```
+
+- 1：將推送目的地改為自己的儲存庫。  
+- 2：確認遠端網址已指向自己的帳號與專案。  
+- 3：加入已客製化的頁面、設定及 QR 圖片變更。  
+- 4：建立提交；Git 需已設定提交者姓名與電子郵件。  
+- 5：將目前分支推送至自己的遠端儲存庫，並設定追蹤關係；需要該儲存庫的寫入權限。  
+
+若使用 GitHub Pages，請在自己的儲存庫啟用 Pages，選擇實際推送的分支與包含 `index.html` 的根目錄作為發佈來源。發佈完成後，以服務提供的網址檢查網站。  
+
+### 日常內容更新
+
+透過 `manager.py` 儲存內容後，在自己的專案目錄執行：  
 
 ```bash
 git diff -- config.json
@@ -236,11 +290,16 @@ git push
 - 1：檢查設定差異。  
 - 2：加入設定檔。  
 - 3：建立提交。  
-- 4：推送目前分支；確認網站發佈流程成功後，再重新整理頁面。  
+- 4：推送至自己的儲存庫；確認發佈完成後，再重新整理網站。  
 
-若更換 QR 圖片，也需提交對應圖片。管理程式只修改本機檔案，不會自行提交 Git 或推送遠端。  
+若更換 QR 圖片或修改頁面，也需提交對應檔案。管理程式只修改本機檔案，不會自行提交 Git 或推送遠端。  
 
 ## 常見問題（FAQ）
+
+### 為什麼 clone 後仍看到師大附中 1640 班的內容？
+
+來源專案的 `main` 分支正在用於該班公告。請先初始化設定，再依「修改班級識別與素材」調整 HTML 固定文字及圖片；初始化不會自動改寫這些內容。  
+
 
 ### 如何查看完整指令或指定其他設定檔？
 
@@ -274,4 +333,6 @@ python3 manager.py --config ./test-config.json cleanup show
 
 ## 聯絡與回饋（Feedback / Support）
 
-公告內容以學校正式公告為準。日程如有缺漏，可聯絡 [310394@gs.hs.ntnu.edu.tw](mailto:310394@gs.hs.ntnu.edu.tw)。  
+模板或管理工具的問題，可透過[來源專案](https://github.com/havelightii/hsnu-1640)回報，並附上操作步驟、錯誤訊息及使用環境。  
+
+各班公告的內容問題，請聯絡該網站的維護者；公告仍以所屬學校的正式公告為準。架站時請將頁尾聯絡資訊換成自己的聯絡方式。  
