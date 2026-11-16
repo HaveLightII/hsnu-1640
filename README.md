@@ -283,7 +283,25 @@ node tests/test_theme.cjs
 
 `src-tauri/` 提供 Tauri 2 Android App，前端僅內建 `src-tauri/index.html`，`frontendDist` 使用 `["index.html"]`。預設公告設定與相對 `qr/` 圖片讀取 `https://raw.githubusercontent.com/havelightii/hsnu-1640/main/`，可用 `manager.py project` 客製化；本機 `config.json` 與 `project.json` 不會打包進 App。一般公告更新推送到來源 main 後，可在 App 重新整理，仍可能受遠端快取傳播時間影響。  
 
-App 會在開啟、回到前景、網路恢復及按下重新整理時更新；請求逾時為 15 秒，失敗時清除畫面上的前次公告，不持久儲存公告。外部連結交由 Opener 開啟，行事曆另提供瀏覽器入口。網站與 App 各自維護 HTML，介面修改後需要重建 APK。App 與 Android launcher 圖示由根目錄 `icon.jpg` 產生，保留原圖比例並補齊為正方形。  
+App 會在開啟、回到前景、網路恢復及按下重新整理時更新；請求逾時為 15 秒，失敗時清除畫面上的前次公告，不持久儲存公告。外部連結交由 Opener 開啟，行事曆另提供瀏覽器入口。網站與 App 各自維護 HTML，介面修改後需要重建 APK。App 與 Android launcher 圖示由根目錄 `icon.jpg` 產生，保留原圖比例並補齊為正方形；Android launcher 使用高解析度 WebP，Tauri 內嵌視窗圖示縮至 64×64，避免多帶一份大型 RGBA 點陣資料。重新產生 PNG 圖示後，可安裝 libwebp 並執行 `sh scripts/optimize-android-icons.sh`，同時完成品質 85 的 WebP 轉換與視窗圖示縮小。  
+
+### 建置精簡 ARM64-v8a APK
+
+發布下載只提供 ARM64-v8a。使用 release 模式，Rust 啟用 `opt-level = "z"`、LTO、單一 codegen unit、panic abort 及移除符號；Tauri 移除未授權的原生命令，Android 啟用 R8、資源縮減與原生程式庫壓縮，套件原生語系保留預設、英文與繁體中文。若客製化其他語言，可調整 Android `localeFilters`；網頁文字不受這個設定影響。前端仍只內建一個 HTML，沒有打包 WebView 引擎。設定依據：Tauri. (n.d.). [App size](https://v2.tauri.app/concept/size/). Android Developers. (n.d.). [Reduce your app size](https://developer.android.com/topic/performance/reduce-apk-size).  
+
+```bash
+cargo tauri android build --apk --target aarch64 --split-per-abi
+```
+
+原生專案與工具鏈設定同下方 debug 建置說明。此命令產生 `src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release-unsigned.apk`，不建置其他 ABI，也不產生 AAB。未簽章的 APK 須先簽章才能安裝；release 編譯模式與簽章身分是兩件事。此專案的 GitHub 測試下載沿用既有 Android debug 簽章，未建立正式上架身分。  
+
+若本機已有 Android debug keystore，可使用既有工具簽署：  
+
+```bash
+java -jar ~/bin/uber-apk-signer.jar --apks src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release-unsigned.apk --ksDebug ~/.android/debug.keystore --out /tmp/hsnu-signed
+```
+
+正式發佈到商店時，需另行管理此 App 的正式簽章；不要將正式金鑰、密碼或 keystore 設定提交到 Git。  
 
 ### 建置 debug APK
 

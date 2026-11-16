@@ -39,9 +39,12 @@ android {
             }
         }
         getByName("release") {
-            optimization {
-               enable = true
+            isMinifyEnabled = true
+            isShrinkResources = true
+            packaging {
+                jniLibs.useLegacyPackaging = true
             }
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             proguardFiles(
                 *fileTree(".") {
                   include("**/*.pro")
@@ -56,6 +59,9 @@ android {
     }
     buildFeatures {
         buildConfig = true
+    }
+    androidResources {
+        localeFilters += listOf("en", "zh-rTW")
     }
 }
 
