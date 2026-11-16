@@ -1,0 +1,24 @@
+{
+  "identifier": "main-capability",
+  "description": "班級公告主視窗之外部連結權限",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*"
+        },
+        {
+          "url": "mailto:*"
+        }
+      ]
+    }
+  ]
+}

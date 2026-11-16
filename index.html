@@ -413,6 +413,9 @@
 </script>
 
 <script>
+  // project-settings:start
+  const resourceBase = new URL("./", window.location.href).href;
+  // project-settings:end
   const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
 
   function todayString() {
@@ -567,7 +570,7 @@
       anchor.rel = "noopener noreferrer";
       if (row.image && (/^qr\/[a-zA-Z0-9_.-]+$/.test(row.image) || safeUrl(row.image))) {
         const image = document.createElement("img");
-        image.src = row.image;
+        image.src = new URL(row.image, resourceBase).href;
         image.alt = `${row.label} QR code`;
         anchor.appendChild(image);
       }
@@ -600,7 +603,7 @@
     container.appendChild(frame);
   }
 
-  fetch("config.json", { cache: "no-store" })
+  fetch(new URL("config.json", resourceBase).href, { cache: "no-store" })
     .then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();

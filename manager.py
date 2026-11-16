@@ -1,5 +1,6 @@
 """班級公告統一管理工具，僅使用 Python 標準函式庫。"""
 import argparse
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,10 @@ from datetime import date, datetime
 from urllib.parse import urlparse
 
 configPath = Path(__file__).resolve().with_name("config.json")
+projectPath = Path(__file__).resolve().parent
+projectFields = {"appName": "App 名稱", "pageTitle": "頁面標題", "subtitle": "副標題",
+                 "footer": "頁尾與聯絡資訊", "syncUrl": "App／共同同步基底網址",
+                 "websiteSyncUrl": "網站同步基底網址（./ 表示同目錄）", "appIdentifier": "Android App 識別碼"}
 sectionFields = {
     "exams": ("date", "subject", "range"),
     "homework": ("date", "item", "link"),
@@ -132,6 +137,169 @@ def initialize(path):
     print("已初始化：小考、作業、事項、常用連結及行事曆設定均已清空")
 
 
+def validateProject(settings):
+    if not isinstance(settings, dict) or set(settings) != set(projectFields):
+        raise ValueError("project.json 欄位不完整")
+    for key, value in settings.items():
+        if not isinstance(value, str) or (key != "footer" and not value.strip()):
+            raise ValueError(f"{projectFields[key]}必須是字串且不可空白")
+        if any(ord(char) < 32 for char in value):
+            raise ValueError(f"{projectFields[key]}不可包含換行或控制字元")
+    if re.search(r'[\\/:*?"<>|]', settings["appName"]):
+        raise ValueError('App 名稱不可包含 Tauri 不支援的字元：\\ / : * ? " < > |')
+    for key in ("syncUrl", "websiteSyncUrl"):
+        if key == "websiteSyncUrl" and settings[key] == "./":
+            continue
+        url = urlparse(settings[key])
+        if (url.scheme != "https" or not url.hostname or url.username or url.password
+                or url.query or url.fragment or not settings[key].endswith("/")
+                or any(char in settings[key] for char in "\"'<>\\")):
+            raise ValueError(f"{projectFields[key]}須為無帳密、查詢參數的 HTTPS 目錄網址，並以 / 結尾")
+        validateUrl(settings[key])
+        try:
+            url.port
+        except ValueError as error:
+            raise ValueError("同步網址的連接埠無效") from error
+    identifier = settings["appIdentifier"]
+    reserved = set("""abstract as assert boolean break byte case catch char class const continue
+        default do double else enum extends false final finally float for fun goto if implements
+        import in instanceof int interface is long native new null object package private protected
+        public return short static strictfp super switch synchronized this throw throws transient
+        true try typealias typeof val var void volatile when while""".split())
+    if (not re.fullmatch(r"[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){2,}", identifier)
+            or reserved.intersection(identifier.split("."))):
+        raise ValueError("App 識別碼須為至少三段的小寫 Java 套件名稱，例如 org.example.class1640")
+
+
+def loadProject(root):
+    settings = json.loads((root / "project.json").read_text(encoding="utf-8"))
+    validateProject(settings)
+    return settings
+
+
+def replaceProjectText(text, pattern, replacement):
+    updated, count = re.subn(pattern, lambda _: replacement, text, flags=re.DOTALL)
+    if count != 1:
+        raise ValueError(f"客製化標記不唯一或不存在：{pattern}")
+    return updated
+
+
+def saveProject(root, settings):
+    validateProject(settings)
+    tauriPath = root / "src-tauri/tauri.conf.json"
+    tauri = json.loads(tauriPath.read_text(encoding="utf-8"))
+    oldIdentifier = tauri["identifier"]
+    changes = {}
+    for name, baseKey in (("index.html", "websiteSyncUrl"), ("src-tauri/index.html", "syncUrl")):
+        path = root / name
+        text = path.read_text(encoding="utf-8")
+        oldBase = re.search(r'const resourceBase = new URL\((".*?"), window.location.href\).href;', text)
+        if name.startswith("src-tauri"):
+            if not oldBase:
+                raise ValueError("App 同步網址標記不存在")
+            oldUrl = urlparse(json.loads(oldBase[1]))
+        for pattern, replacement in (
+            (r"<title>.*?</title>", f"<title>{escape(settings['pageTitle'])}</title>"),
+            (r"<h1>.*?</h1>", f"<h1>{escape(settings['pageTitle'])}</h1>"),
+            (r'<p class="subtitle">.*?</p>', f'<p class="subtitle">{escape(settings["subtitle"])}</p>'),
+            (r"<footer>.*?</footer>", f"<footer>{escape(settings['footer'])}</footer>"),
+        ):
+            text = replaceProjectText(text, pattern, replacement)
+        baseJson = json.dumps(settings[baseKey], ensure_ascii=True).replace("<", "\\u003c")
+        text = replaceProjectText(text, r"// project-settings:start.*?// project-settings:end",
+                                  f"// project-settings:start\n  const resourceBase = new URL({baseJson}, window.location.href).href;\n  // project-settings:end")
+        changes[path] = text.encode("utf-8")
+    newUrl = urlparse(settings["syncUrl"])
+    csp = tauri["app"]["security"]["csp"]
+    oldOrigin = f"{oldUrl.scheme}://{oldUrl.netloc}"
+    newOrigin = f"{newUrl.scheme}://{newUrl.netloc}"
+    sources = [source for source in csp["connect-src"].split() if source != oldOrigin]
+    csp["connect-src"] = " ".join(dict.fromkeys([*sources, newOrigin]))
+    tauri["productName"] = settings["appName"]
+    tauri["identifier"] = settings["appIdentifier"]
+    tauri["app"]["windows"][0]["title"] = settings["appName"]
+    changes[tauriPath] = (json.dumps(tauri, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    androidPath = root / "src-tauri/gen/android"
+    if androidPath.exists():
+        gradlePath = androidPath / "app/build.gradle.kts"
+        gradle = gradlePath.read_text(encoding="utf-8")
+        for field in ("namespace", "applicationId"):
+            gradle = replaceProjectText(gradle, rf'{field} = "[^"]+"',
+                                        f'{field} = "{settings["appIdentifier"]}"')
+        changes[gradlePath] = gradle.encode("utf-8")
+        stringsPath = androidPath / "app/src/main/res/values/strings.xml"
+        strings = stringsPath.read_text(encoding="utf-8")
+        androidName = escape(json.dumps(settings["appName"], ensure_ascii=False), quote=False)
+        for key in ("app_name", "main_activity_title"):
+            strings = replaceProjectText(strings, rf'<string name="{key}"[^>]*>.*?</string>',
+                                          f'<string name="{key}" formatted="false">{androidName}</string>')
+        changes[stringsPath] = strings.encode("utf-8")
+        oldPackage = Path(*oldIdentifier.split("."))
+        newPackage = Path(*settings["appIdentifier"].split("."))
+        activityPath = androidPath / "app/src/main/java" / oldPackage / "MainActivity.kt"
+        activity = activityPath.read_text(encoding="utf-8")
+        activity = replaceProjectText(activity, r"package [a-z0-9_.]+", f'package {settings["appIdentifier"]}')
+        newActivityPath = androidPath / "app/src/main/java" / newPackage / "MainActivity.kt"
+        if newActivityPath != activityPath:
+            if newActivityPath.exists():
+                raise ValueError("新 App 識別碼的 MainActivity.kt 已存在，請先處理衝突")
+            changes[activityPath] = None
+            generatedPath = activityPath.parent / "generated"
+            backupPath = androidPath / ".tauri/customization-backups" / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            for generatedFile in generatedPath.rglob("*"):
+                if generatedFile.is_file():
+                    original = generatedFile.read_bytes()
+                    changes[backupPath / generatedFile.relative_to(androidPath)] = original
+                    migratedPath = newActivityPath.parent / "generated" / generatedFile.relative_to(generatedPath)
+                    if migratedPath.exists():
+                        raise ValueError("新套件下已有 generated 程式碼，請先處理衝突")
+                    changes[migratedPath] = original.replace(oldIdentifier.encode(), settings["appIdentifier"].encode())
+                    changes[generatedFile] = None
+        changes[newActivityPath] = activity.encode("utf-8")
+    changes[root / "project.json"] = (json.dumps(settings, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    originals = {path: path.read_bytes() if path.exists() else None for path in changes}
+
+    def writeFile(path, content):
+        if content is None:
+            path.unlink(missing_ok=True)
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tempPath = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".config-", delete=False) as target:
+                tempPath = Path(target.name)
+                target.write(content)
+                target.flush()
+                os.fsync(target.fileno())
+            tempPath.chmod(path.stat().st_mode if path.exists() else 0o644)
+            os.replace(tempPath, path)
+        finally:
+            if tempPath and tempPath.exists():
+                tempPath.unlink()
+
+    try:
+        for path, content in changes.items():
+            writeFile(path, content)
+    except OSError:
+        for path, content in originals.items():
+            writeFile(path, content)
+        raise
+    print("已同步網站、App 與原生專案設定；公告資料未變更。App 設定需重建 APK 才會生效。")
+
+
+def customizeProject(root):
+    settings = loadProject(root)
+    print("修改網站與 App 客製化設定；輸入 back 可取消，Enter 保留目前值。")
+    for key, label in projectFields.items():
+        value = readInput(f"{label} [{settings[key]}]：")
+        if value:
+            settings[key] = value
+            if key == "syncUrl":
+                settings["websiteSyncUrl"] = value
+    validateProject(settings)
+    saveProject(root, settings)
+
+
 def showRows(config, section):
     rows = config[section]
     if section == "calendar":
@@ -195,6 +363,7 @@ def interactive(path):
     while True:
         print("\n1. 小考  2. 作業  3. 事項  4. 常用連結  5. 行事曆")
         print("6. 儲存並離開  7. 不儲存離開  8. 初始化（立即儲存）  9. 自動清理設定")
+        print("10. 網站／App 客製化設定（立即套用）")
         print(f"目前清理模式：{cleanupPolicies[config['cleanupPolicy']]}")
         try:
             choice = readInput("請選擇（輸入 back 取消當次操作）：")
@@ -219,6 +388,9 @@ def interactive(path):
                     raise ValueError("無效選項")
                 config["cleanupPolicy"] = policies[policyChoice]
                 print("設定已修改；儲存後於下次啟動時套用")
+                continue
+            if choice == "10":
+                customizeProject(projectPath)
                 continue
             if choice not in sections:
                 raise ValueError("無效選項")
@@ -262,6 +434,16 @@ def buildParser():
     parser = argparse.ArgumentParser(description="班級公告管理；無子指令時進入互動模式")
     parser.add_argument("--config", type=Path, default=configPath, help="設定檔路徑")
     commands = parser.add_subparsers(dest="command")
+    projectParser = commands.add_parser("project", help="客製化網站與 App；不讀寫或清理公告")
+    projectParser.add_argument("--root", type=Path, default=projectPath, help="專案根目錄")
+    projectActions = projectParser.add_subparsers(dest="action", required=True)
+    for action in ("show", "apply", "wizard"):
+        projectActions.add_parser(action)
+    projectSet = projectActions.add_parser("set")
+    for option, key in (("app-name", "appName"), ("title", "pageTitle"), ("subtitle", "subtitle"),
+                        ("footer", "footer"), ("sync-url", "syncUrl"),
+                        ("website-sync-url", "websiteSyncUrl"), ("app-id", "appIdentifier")):
+        projectSet.add_argument(f"--{option}", dest=key)
     initParser = commands.add_parser("init", help="備份後清空所有設定")
     initParser.add_argument("--yes", action="store_true", help="確認初始化")
     for section, fields in sectionFields.items():
@@ -295,6 +477,28 @@ def main(argv=None):
     args = parser.parse_args(argv)
     path = args.config.resolve()
     try:
+        if args.command == "project":
+            root = args.root.resolve()
+            if args.action == "wizard":
+                setupInput()
+                try:
+                    customizeProject(root)
+                except CancelInput:
+                    print("已取消客製化；所有檔案均未變更")
+                return 0
+            settings = loadProject(root)
+            if args.action == "show":
+                print(json.dumps(settings, ensure_ascii=False, indent=2))
+                return 0
+            if args.action == "set":
+                values = {key: getattr(args, key) for key in projectFields if getattr(args, key) is not None}
+                if not values:
+                    raise ValueError("請指定至少一個客製化欄位，或使用 project wizard")
+                if "syncUrl" in values and "websiteSyncUrl" not in values:
+                    values["websiteSyncUrl"] = values["syncUrl"]
+                settings.update(values)
+            saveProject(root, settings)
+            return 0
         if args.command is None:
             interactive(path)
             return 0

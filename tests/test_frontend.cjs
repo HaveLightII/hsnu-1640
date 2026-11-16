@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const rootPath = path.join(__dirname, '..');
+const rootPath = path.resolve(__dirname, '..', process.argv[2] || '.');
 const html = fs.readFileSync(path.join(rootPath, 'index.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 class Element {
@@ -17,32 +17,42 @@ class Element {
   get innerHTML() { return this.html ?? this.text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
 }
 async function render(config, ok = true) {
+  let requestUrl;
   const nodes = Object.fromEntries(['examList','homeworkList','matterList','noticeBar','quickLinks','calendarWrap'].map(id => [id,new Element('div')]));
   const context = vm.createContext({
     document: {getElementById: id => nodes[id], createElement: tag => new Element(tag),
       createTextNode: text => ({textContent: text})},
-    Date, URL, console,
-    fetch: async () => ({ok, status: 404, json: async () => config}),
+    Date, URL, console, window: {location: {href:'https://example.com/class-board/'}},
+    fetch: async url => { requestUrl = url; return {ok, status: 404, json: async () => config}; },
   });
   vm.runInContext(script, context);
   await new Promise(resolve => setImmediate(resolve));
-  return nodes;
+  return {...nodes, requestUrl};
 }
 (async () => {
   const headings = [...html.matchAll(/<h2>(.*?)<\/h2>/g)].map(match => match[1]);
   assert.deepEqual(headings, ['近期小考','近期作業','近期事項','常用連結','行事曆']);
   assert.equal((html.match(/fetch\(/g) || []).length, 1);
-  const config = JSON.parse(fs.readFileSync(path.join(rootPath, 'config.json'), 'utf8'));
+  const config = {
+    exams: [{date:'2099-12-01',subject:'英文',range:'第一課'}],
+    homework: [], matters: [],
+    links: [{label:'測試連結',url:'https://example.com',image:'qr/test.png',hint:'測試'}],
+    calendar: {url:'https://calendar.google.com/calendar/embed'},
+  };
   config.homework = [{date:'2099-12-01',item:'國文作文',link:'https://example.com/homework'},
     {date:'2000-01-01',item:'舊作業',link:''}];
   config.exams[0].subject = '<img src=x onerror=alert(1)>';
   let nodes = await render(config);
-  assert.equal(nodes.examList.childNodes.length, 9);
+  const settings = JSON.parse(fs.readFileSync(path.join(rootPath, 'project.json'), 'utf8'));
+  const base = new URL(settings.websiteSyncUrl, 'https://example.com/class-board/');
+  assert.equal(nodes.requestUrl, new URL('config.json', base).href);
+  assert.equal(nodes.quickLinks.childNodes[0].childNodes[0].src, new URL('qr/test.png', base).href);
+  assert.equal(nodes.examList.childNodes.length, 1);
   assert.ok(nodes.examList.childNodes[0].innerHTML.includes('&lt;img'));
   assert.equal(nodes.homeworkList.childNodes.length, 1);
   assert.equal(nodes.homeworkList.childNodes[0].childNodes[1].textContent, '國文作文');
   assert.equal(nodes.homeworkList.childNodes[0].childNodes[2].childNodes[0].href, 'https://example.com/homework');
-  assert.equal(nodes.quickLinks.childNodes.length, 4);
+  assert.equal(nodes.quickLinks.childNodes.length, 1);
   assert.equal(nodes.calendarWrap.childNodes[0].src, config.calendar.url);
   config.homework[0].link = 'javascript:alert(1)';
   nodes = await render(config);

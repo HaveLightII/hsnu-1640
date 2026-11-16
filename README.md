@@ -34,29 +34,52 @@
 git clone https://github.com/havelightii/hsnu-1640.git my-class-board
 cd my-class-board
 python3 manager.py init --yes
+python3 manager.py project wizard
 python3 manager.py
 ```
 
 - 1：將專案複製至自己的 `my-class-board` 資料夾；可自行更改資料夾名稱。  
 - 2：進入專案目錄。  
 - 3：備份並清空複製過來的小考、作業、事項、常用連結與行事曆設定，將自動清理模式設為 `never`。  
-- 4：開啟管理選單，加入自己班級的內容，完成後選擇「儲存並離開」。  
+- 4：設定自己的 App 名稱、網站標題、同步網址、聯絡資訊與 App 識別碼。  
+- 5：開啟管理選單，加入自己班級的內容，完成後選擇「儲存並離開」。  
 
 初始化只影響本機這份專案，不會修改來源儲存庫。請在新複製的模板中執行；已有自用資料時，初始化也會清空那些資料。  
 
 ### 修改班級識別與素材
 
-初始化不會修改 `index.html` 的固定文字，也不會刪除圖片。首次使用請自行調整：  
+初始化只處理公告；網站與 App 識別由獨立的 `project.json` 管理，可透過精靈或指令一次套用：  
+
+```bash
+python3 manager.py project show
+python3 manager.py project wizard
+python3 manager.py project set --app-name "我的班級" --title "班級公告" --subtitle "我的學校 123 班" --footer "聯絡：class@example.com" --app-id org.example.class123 --sync-url https://raw.githubusercontent.com/YOUR_NAME/YOUR_REPO/main/ --website-sync-url ./
+python3 manager.py project apply
+```
+
+`show` 查看設定；`wizard` 逐項輸入，Enter 保留、`back` 取消；`set` 更新指定欄位並立即套用；手動編輯 `project.json` 後使用 `apply`。這些子指令不讀寫 `config.json`，也不會執行公告清理；一般互動選單第 10 項也提供同一精靈，但進入一般選單時仍依既有規則套用公告清理。  
+
+`--sync-url` 是含 `config.json` 與 `qr/` 的 HTTPS 目錄網址，須以 `/` 結尾；預設同步更新 App 及網站來源。若網站要繼續讀同目錄公告，另加 `--website-sync-url ./`。精靈修改共同網址後，下一題也可將網站來源改回 `./`。跨網域來源必須允許 CORS；App CSP 的連線來源會同步更新。網址不可包含帳密、權杖查詢參數或 fragment。  
+
+| 欄位 | 同步位置 |
+| --- | --- |
+| `appName` | Tauri productName、視窗名稱、Android launcher 名稱 |
+| `pageTitle`、`subtitle`、`footer` | 網站與 App HTML 的標題、副標題及頁尾 |
+| `syncUrl` | App 公告與相對圖片來源、Tauri 連線 CSP |
+| `websiteSyncUrl` | 網站公告與相對圖片來源；`./` 表示同目錄 |
+| `appIdentifier` | Tauri identifier、Android applicationId／namespace／MainActivity 套件與路徑 |
+
+App 識別碼使用至少三段的小寫 Java 套件名稱，不可使用保留字。更換識別碼會成為另一個 App；保留 Rust crate 名稱可繼續沿用建置設定。舊套件下的 `generated` 程式碼會備份至 Android `.tauri/customization-backups/`，再遷移到新套件並更新套件名稱，避免殘留程式碼影響重建。設定套用前會先檢查全部目標，寫入失敗時嘗試復原；不會重設公告或重新初始化 Android 專案。請將設定與產生的檔案一起提交。App 變更需重建 APK；網站變更需重新部署靜態檔案。  
+
+首次使用也請調整以下素材與內容：  
 
 | 位置 | 要修改的內容 |
 | --- | --- |
-| `index.html` 的 `<title>` | 瀏覽器分頁標題 |
-| `index.html` 的 `<h1>` 與 `.subtitle` | 網站名稱、學校與班級名稱 |
-| `index.html` 的 `<footer>` | 公告說明與自己的聯絡資訊 |
+| `icon.jpg` | 更換 App 圖示來源，再用 Tauri CLI 產生原生圖示 |
 | `qr/` | 更換或移除不屬於自己班級的 QR 圖片 |
 | 管理工具的「常用連結」與「行事曆」 | 填入自己的網址、圖片路徑與行事曆嵌入網址 |
 
-需要調整外觀時，可編輯 `index.html` 中的 CSS。班級識別與頁面外觀目前不由 `manager.py` 管理。  
+需要調整外觀時，可編輯兩份 HTML 中的 CSS；保留 `project-settings` 標記及標題、頁尾結構，供管理工具套用客製化。  
 
 ## 本機預覽（Run Locally）
 
@@ -254,7 +277,35 @@ node tests/test_theme.cjs
 
 - 3：驗證主題初始選擇、切換、偏好儲存、系統變更與儲存受限時的操作。  
 
-前端測試部分斷言依來源專案的資料數量設定；初始化或客製化資料後，需依自己的測試資料調整斷言。測試使用 DOM 替身，不包含實際瀏覽器排版、QR 圖片內容或外部行事曆的可用性檢查。這些項目請透過本機預覽確認。  
+前端測試使用固定資料及 DOM 替身，不會讀寫正式公告；不包含實際瀏覽器排版、QR 圖片內容或外部行事曆的可用性檢查。這些項目請透過本機預覽確認。  
+
+## Android App
+
+`src-tauri/` 提供 Tauri 2 Android App，前端僅內建 `src-tauri/index.html`，`frontendDist` 使用 `["index.html"]`。預設公告設定與相對 `qr/` 圖片讀取 `https://raw.githubusercontent.com/havelightii/hsnu-1640/main/`，可用 `manager.py project` 客製化；本機 `config.json` 與 `project.json` 不會打包進 App。一般公告更新推送到來源 main 後，可在 App 重新整理，仍可能受遠端快取傳播時間影響。  
+
+App 會在開啟、回到前景、網路恢復及按下重新整理時更新；請求逾時為 15 秒，失敗時清除畫面上的前次公告，不持久儲存公告。外部連結交由 Opener 開啟，行事曆另提供瀏覽器入口。網站與 App 各自維護 HTML，介面修改後需要重建 APK。App 與 Android launcher 圖示由根目錄 `icon.jpg` 產生，保留原圖比例並補齊為正方形。  
+
+### 建置 debug APK
+
+沿用既有 JDK 17、Android SDK 與單一版本 NDK，設定 `JAVA_HOME`、`ANDROID_HOME`、`NDK_HOME`。目前原生專案使用 Android SDK 37、Gradle 9.6.1、Android Gradle Plugin 9.3.1；最低 Android API 為 24。Cargo CLI 須在 PATH 中，讓 Gradle 能呼叫 `cargo tauri`。  
+
+```bash
+cargo install tauri-cli --version 2.12.1 --locked
+rustup target add aarch64-linux-android
+cargo tauri android build --debug --apk --target aarch64
+```
+
+Android 原生專案已納入 `src-tauri/gen/android/`，不需再次初始化。ARM64 debug APK 位於 `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`，使用 Android debug 簽章，供測試安裝。不要將 debug APK 作為正式上架版本，也不要提交簽章金鑰或本機 SDK 設定。  
+
+```bash
+node tests/test_tauri.cjs
+node tests/test_theme.cjs src-tauri/index.html
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+```
+
+安裝前先確認裝置；若已有相同識別碼但不同簽章的 App，保留原 App 並處理簽章來源，避免直接移除造成資料損失。改供其他班級使用時，以 `manager.py project wizard` 同步調整來源、班級文字與 App 識別碼，再重建 APK。  
+
+設定與命令參考：Tauri. (n.d.). [Configuration](https://v2.tauri.app/reference/config/). Tauri. (n.d.). [Command line interface](https://tauri.app/reference/cli/).  
 
 ## 發佈自己的網站（Deployment）
 
@@ -309,7 +360,7 @@ QR 圖片保留原色，Google 行事曆等外部嵌入內容不受本站主題�
 
 ### 為什麼 clone 後仍看到師大附中 1640 班的內容？
 
-來源專案的 `main` 分支正在用於該班公告。請先初始化設定，再依「修改班級識別與素材」調整 HTML 固定文字及圖片；初始化不會自動改寫這些內容。  
+來源專案的 `main` 分支正在用於該班公告。請在自己的 clone 中初始化公告，再執行 `python3 manager.py project wizard`，同步修改網站與 App 的文字、來源及識別碼，並更換 QR 圖片與連結。初始化公告不會重設 `project.json`。  
 
 
 ### 如何查看完整指令或指定其他設定檔？

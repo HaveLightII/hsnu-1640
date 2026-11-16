@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小考日程表</title>
+<script id="theme-init">
+  window.classBoardTheme = (() => {
+    const storageKey = "classBoardTheme";
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    let preference = null;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved === "light" || saved === "dark") preference = saved;
+    } catch (_) {}
+
+    function refresh() {
+      const theme = preference || (systemTheme.matches ? "dark" : "light");
+      document.documentElement.dataset.theme = theme;
+      const button = document.getElementById("themeToggle");
+      if (button) {
+        button.hidden = false;
+        button.setAttribute("aria-pressed", String(theme === "dark"));
+        button.title = theme === "dark" ? "切換為淺色模式" : "切換為深色模式";
+      }
+    }
+
+    function toggle() {
+      preference = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      try { localStorage.setItem(storageKey, preference); } catch (_) {}
+      refresh();
+    }
+
+    refresh();
+    if (systemTheme.addEventListener) systemTheme.addEventListener("change", refresh);
+    window.addEventListener("storage", event => {
+      if (event.key !== storageKey && event.key !== null) return;
+      preference = event.newValue === "light" || event.newValue === "dark" ? event.newValue : null;
+      refresh();
+    });
+    return { refresh, toggle };
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1f2a44;
+    --paper: #faf7f0;
+    --rule: #d9d3c1;
+    --gold: #b9902a;
+    --soon: #c1502e;
+    --done: #6b8f71;
+    --muted: #6b6558;
+    --surface: #ffffff;
+    --notice: #fbf1da;
+    --focus: #815e0d;
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #eee9de;
+    --paper: #151a22;
+    --surface: #1e2632;
+    --rule: #414958;
+    --gold: #d7b66e;
+    --soon: #f2a183;
+    --done: #a2c3a4;
+    --muted: #b7b4ad;
+    --notice: #302a20;
+    --focus: #e7c884;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .title-row h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    margin: 0;
+  }
+
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .theme-toggle[hidden] { display: none; }
+  .theme-toggle:hover { border-color: var(--gold); }
+  .theme-toggle[aria-pressed="true"] {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .theme-toggle svg { width: 18px; height: 18px; }
+  a:focus-visible, button:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 4px;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Noto Sans TC", sans-serif;
+    line-height: 1.7;
+  }
+
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+
+  h1 {
+    font-family: "Noto Serif TC", serif;
+    font-weight: 700;
+    font-size: 2rem;
+    margin: 0 0 8px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    margin: 0 0 48px;
+    font-size: 0.95rem;
+  }
+
+  section + section { margin-top: 64px; }
+
+  h2 {
+    font-family: "Noto Serif TC", serif;
+    font-size: 1.3rem;
+    font-weight: 500;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 12px;
+    margin-bottom: 0;
+  }
+
+  #examList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #examList li {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 4px 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  #examList li.next {
+    border-left: 3px solid var(--soon);
+    padding-left: 16px;
+    margin-left: -19px;
+  }
+
+  #examList li.past { opacity: 0.5; }
+
+  .exam-date {
+    font-family: "Noto Serif TC", serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .exam-weekday {
+    display: block;
+    font-family: "Noto Sans TC", sans-serif;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .exam-subject {
+    font-weight: 700;
+    grid-column: 2;
+  }
+
+  .exam-range {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    color: var(--soon);
+    border: 1px solid var(--soon);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .status-msg {
+    color: var(--muted);
+    padding: 20px 0;
+  }
+
+  .matter-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .matter-list li {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 4px 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .matter-list .matter-item {
+    font-weight: 700;
+    grid-column: 2;
+  }
+
+  .matter-list .matter-link {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .matter-list a {
+    color: var(--ink);
+    text-decoration-color: var(--gold);
+    text-underline-offset: 3px;
+  }
+
+  .matter-list .status-msg {
+    color: var(--muted);
+    padding: 20px 0;
+  }
+
+  .calendar-wrap {
+    margin-top: 24px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+  }
+
+  .calendar-wrap iframe {
+    display: block;
+    width: 100%;
+    height: 560px;
+    border: 0;
+    color-scheme: light;
+    background: #fff;
+  }
+
+  .quick-links {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+  }
+
+  .quick-link {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    text-decoration: none;
+    color: var(--ink);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .quick-link:hover {
+    border-color: var(--gold);
+    transform: translateY(-1px);
+  }
+
+  .quick-link img {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border: 1px solid var(--rule);
+    background: #fff;
+  }
+
+  .quick-link-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .quick-link-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .quick-link-hint {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  @media (max-width: 480px) {
+    .title-row { gap: 10px; }
+    .title-row h1 { font-size: clamp(1.35rem, 5.5vw, 2rem); }
+    .theme-toggle { padding-inline: 10px; }
+    .quick-links {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  footer {
+    margin-top: 64px;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  #noticeBar {
+    display: none;
+    background: var(--notice);
+    border-top: 1px solid var(--gold);
+    border-bottom: 1px solid var(--gold);
+    color: var(--ink);
+    font-size: 0.85rem;
+    padding: 10px 24px;
+    text-align: center;
+  }
+
+  #noticeBar .notice-label {
+    font-weight: 700;
+    color: var(--gold);
+    margin-right: 8px;
+  }
+
+  #noticeBar .notice-item + .notice-item::before {
+    content: "・";
+    margin: 0 8px;
+    color: var(--muted);
+  }
+  body {
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+  main { padding-top: 28px; }
+  .subtitle { margin-bottom: 16px; }
+  .sync-row { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+  #syncStatus { flex: 1; color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
+  #refreshButton { flex-shrink: 0; }
+  #refreshButton:disabled { opacity: 0.6; cursor: wait; }
+  .calendar-external { display: inline-block; margin: 12px; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="noticeBar"></div>
+<main>
+  <header class="title-row">
+    <h1>小考日程表</h1>
+    <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+        <path d="M20.5 14.4A8.6 8.6 0 0 1 9.6 3.5a8.6 8.6 0 1 0 10.9 10.9Z" />
+      </svg>
+      <span>深色模式</span>
+    </button>
+  </header>
+  <p class="subtitle">HSNU 1640 小考日程表</p>
+  <div class="sync-row">
+    <p id="syncStatus" role="status" aria-live="polite">準備取得遠端公告…</p>
+    <button id="refreshButton" class="theme-toggle" type="button">重新整理</button>
+  </div>
+
+  <section>
+    <h2>近期小考</h2>
+    <ul id="examList">
+      <li class="status-msg">讀取中…</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>近期作業</h2>
+    <ul id="homeworkList" class="matter-list">
+      <li class="status-msg">讀取中…</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>近期事項</h2>
+    <ul id="matterList" class="matter-list">
+      <li class="status-msg">讀取中…</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>常用連結</h2>
+    <div class="quick-links" id="quickLinks"></div>
+  </section>
+
+  <section>
+    <h2>行事曆</h2>
+    <div class="calendar-wrap" id="calendarWrap"></div>
+  </section>
+
+  <footer>所有內容仍以學校公告為準；日程如有不齊全請私訊我或聯絡 310394@gs.hs.ntnu.edu.tw ；本網頁前端有使用AI工具的協助。</footer>
+</main>
+
+<script id="theme-controls">
+  window.classBoardTheme.refresh();
+  document.getElementById("themeToggle").addEventListener("click", window.classBoardTheme.toggle);
+</script>
+
+<script>
+  // project-settings:start
+  const resourceBase = new URL("https://raw.githubusercontent.com/havelightii/hsnu-1640/main/", window.location.href).href;
+  // project-settings:end
+  let isLoading = false;
+  let assetVersion = "";
+  const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
+
+  function todayString() {
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 10);
+  }
+
+  function escapeHtml(value) {
+    const span = document.createElement("span");
+    span.textContent = value || "";
+    return span.innerHTML;
+  }
+
+  function renderExams(rows) {
+    const list = document.getElementById("examList");
+    list.innerHTML = "";
+
+    const todayStr = todayString();
+
+    const valid = rows
+      .filter(r => r.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (valid.length === 0) {
+      list.innerHTML = '<li class="status-msg">目前沒有小考資料</li>';
+      return;
+    }
+
+    let nextMarked = false;
+
+    valid.forEach(row => {
+      const li = document.createElement("li");
+      const isPast = row.date < todayStr;
+      const isNext = !isPast && !nextMarked;
+      if (isNext) nextMarked = true;
+
+      li.className = isPast ? "past" : (isNext ? "next" : "");
+
+      const d = new Date(row.date + "T00:00:00");
+      const weekday = isNaN(d) ? "" : weekdayNames[d.getDay()];
+
+      li.innerHTML = `
+        <div class="exam-date">${row.date}<span class="exam-weekday">週${weekday}</span></div>
+        <div class="exam-subject">${escapeHtml(row.subject)}${isNext ? '<span class="tag">最近</span>' : ""}</div>
+        <div class="exam-range">${escapeHtml(row.range)}</div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  function renderNotice(rows) {
+    const bar = document.getElementById("noticeBar");
+    const todayStr = todayString();
+
+    const upcoming = rows
+      .filter(r => r.date && r.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (upcoming.length === 0) {
+      bar.style.display = "none";
+      return;
+    }
+
+    bar.replaceChildren();
+    const label = document.createElement("span");
+    label.className = "notice-label";
+    label.textContent = "近期重要事項";
+    bar.appendChild(label);
+    const first = upcoming[0];
+    const item = document.createElement("span");
+    item.className = "notice-item";
+    item.textContent = `${first.date} ${first.item || first.range || ""}`;
+    bar.appendChild(item);
+    bar.style.display = "block";
+  }
+
+  function renderMatters(rows, listId = "matterList", label = "事項") {
+    const list = document.getElementById(listId);
+    list.replaceChildren();
+
+    const upcoming = rows
+      .filter(row => row.date && row.date >= todayString())
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (upcoming.length === 0) {
+      const li = document.createElement("li");
+      li.className = "status-msg";
+      li.textContent = `目前沒有近期${label}`;
+      list.appendChild(li);
+      return;
+    }
+
+    upcoming.forEach(row => {
+      const li = document.createElement("li");
+      const dateCell = document.createElement("div");
+      dateCell.className = "exam-date";
+      const date = new Date(`${row.date}T00:00:00`);
+      const weekday = isNaN(date) ? "" : weekdayNames[date.getDay()];
+      dateCell.append(document.createTextNode(row.date));
+      if (weekday) {
+        const weekdayCell = document.createElement("span");
+        weekdayCell.className = "exam-weekday";
+        weekdayCell.textContent = `週${weekday}`;
+        dateCell.appendChild(weekdayCell);
+      }
+
+      const itemCell = document.createElement("div");
+      itemCell.className = "matter-item";
+      itemCell.textContent = row.item || row.range || "";
+
+      const linkCell = document.createElement("div");
+      linkCell.className = "matter-link";
+      const linkText = row.link || "";
+      if (linkText) {
+        try {
+          const url = new URL(linkText);
+          if (url.protocol === "https:" || url.protocol === "http:") {
+            const anchor = document.createElement("a");
+            anchor.href = url.href;
+            anchor.target = "_blank";
+            anchor.rel = "noopener";
+            anchor.textContent = "相關連結";
+            linkCell.appendChild(anchor);
+          }
+        } catch (_) {}
+      }
+      if (!linkCell.childNodes.length) linkCell.textContent = "";
+
+      li.append(dateCell, itemCell, linkCell);
+      list.appendChild(li);
+    });
+  }
+
+  function safeUrl(value) {
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    } catch (_) { return ""; }
+  }
+
+  function renderLinks(rows) {
+    const container = document.getElementById("quickLinks");
+    container.replaceChildren();
+    rows.forEach(row => {
+      const url = safeUrl(row.url);
+      if (!url) return;
+      const anchor = document.createElement("a");
+      anchor.className = "quick-link";
+      anchor.href = url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      if (row.image && (/^qr\/[a-zA-Z0-9_.-]+$/.test(row.image) || safeUrl(row.image))) {
+        const image = document.createElement("img");
+        const imageUrl = new URL(row.image, resourceBase);
+        if (imageUrl.origin === new URL(resourceBase).origin) {
+          imageUrl.searchParams.set("v", assetVersion);
+        }
+        image.src = imageUrl.href;
+        image.alt = `${row.label} QR code`;
+        anchor.appendChild(image);
+      }
+      const text = document.createElement("span");
+      text.className = "quick-link-text";
+      for (const [field, className] of [["label", "quick-link-label"], ["hint", "quick-link-hint"]]) {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = row[field] || "";
+        text.appendChild(span);
+      }
+      anchor.appendChild(text);
+      container.appendChild(anchor);
+    });
+    if (!container.childNodes.length) container.textContent = "目前沒有常用連結";
+  }
+
+  function renderCalendar(calendar) {
+    const container = document.getElementById("calendarWrap");
+    container.replaceChildren();
+    const url = safeUrl(calendar.url);
+    if (!url) {
+      container.textContent = "尚未設定行事曆";
+      return;
+    }
+    const frame = document.createElement("iframe");
+    frame.src = url;
+    frame.title = "班級行事曆";
+    frame.loading = "lazy";
+    container.appendChild(frame);
+    const anchor = document.createElement("a");
+    anchor.className = "calendar-external";
+    anchor.href = url;
+    anchor.textContent = "在瀏覽器開啟行事曆";
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    container.appendChild(anchor);
+  }
+
+  function validateConfig(config) {
+    if (!config || typeof config !== "object") throw new Error("設定不是物件");
+    const fields = {
+      exams: ["date", "subject", "range"],
+      homework: ["date", "item", "link"],
+      matters: ["date", "item", "link"],
+      links: ["label", "url", "image", "hint"]
+    };
+    for (const [key, names] of Object.entries(fields)) {
+      if (!Array.isArray(config[key])) throw new Error(`設定缺少 ${key} 陣列`);
+      for (const row of config[key]) {
+        if (!row || names.some(name => typeof row[name] !== "string")) {
+          throw new Error(`${key} 欄位不完整或不是字串`);
+        }
+        if (names.includes("date") && !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
+          throw new Error(`${key} 日期格式錯誤`);
+        }
+      }
+    }
+    if (!config.calendar || typeof config.calendar.url !== "string") {
+      throw new Error("設定缺少 calendar.url");
+    }
+  }
+
+  function showLoadError(message) {
+    document.getElementById("noticeBar").style.display = "none";
+    for (const id of ["examList", "homeworkList", "matterList", "quickLinks", "calendarWrap"]) {
+      const container = document.getElementById(id);
+      container.replaceChildren();
+      const item = document.createElement(id.endsWith("List") ? "li" : "p");
+      item.className = "status-msg";
+      item.textContent = "無法取得遠端資料，請確認網路後按「重新整理」。";
+      container.appendChild(item);
+    }
+    document.getElementById("syncStatus").textContent = `更新失敗：${message}。目前未顯示公告。`;
+  }
+
+  async function loadConfig() {
+    if (isLoading) return;
+    isLoading = true;
+    const button = document.getElementById("refreshButton");
+    const status = document.getElementById("syncStatus");
+    button.disabled = true;
+    status.textContent = "正在取得遠端公告；畫面如有內容，為前次載入資料…";
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const requestUrl = new URL("config.json", resourceBase);
+      requestUrl.searchParams.set("v", String(Date.now()));
+      const response = await fetch(requestUrl.href, {
+        cache: "no-store",
+        credentials: "omit",
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const config = await response.json();
+      validateConfig(config);
+      assetVersion = String(Date.now());
+      renderExams(config.exams);
+      renderMatters(config.homework, "homeworkList", "作業");
+      renderMatters(config.matters);
+      renderNotice(config.matters);
+      renderLinks(config.links);
+      renderCalendar(config.calendar);
+      status.textContent = `本次取得時間：${new Date().toLocaleString("zh-TW")}`;
+    } catch (error) {
+      showLoadError(error.name === "AbortError" ? "連線逾時（15 秒）" : error.message);
+    } finally {
+      clearTimeout(timeoutId);
+      button.disabled = false;
+      isLoading = false;
+    }
+  }
+
+  document.getElementById("refreshButton").addEventListener("click", loadConfig);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void loadConfig();
+  });
+  window.addEventListener("online", () => {
+    if (document.visibilityState === "visible") void loadConfig();
+  });
+  document.addEventListener("click", event => {
+    const anchor = event.target.closest?.("a[href]");
+    if (!anchor || !window.__TAURI__) return;
+    const url = new URL(anchor.href, window.location.href);
+    if (!["https:", "http:", "mailto:"].includes(url.protocol)) return;
+    event.preventDefault();
+    const opener = window.__TAURI__.opener;
+    if (!opener) {
+      window.alert("外部連結功能未初始化，請檢查 Opener 設定。");
+      return;
+    }
+    opener.openUrl(url.href).catch(error => {
+      console.error(error);
+      window.alert("無法開啟外部連結，請確認有可處理此網址的應用程式。");
+    });
+  });
+  void loadConfig();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.resolve(__dirname, '..', process.argv[2] || 'index.html'), 'utf8');
 const initScript = html.match(/<script id="theme-init">([\s\S]*?)<\/script>/)[1];
 const controlsScript = html.match(/<script id="theme-controls">([\s\S]*?)<\/script>/)[1];
 function openPage({saved = null, dark = false, blocked = false} = {}) {
