@@ -1,16 +1,6 @@
 {
   "exams": [
     {
-      "date": "2026-11-19",
-      "subject": "公民",
-      "range": "選修第三章"
-    },
-    {
-      "date": "2026-11-19",
-      "subject": "英文",
-      "range": "mock"
-    },
-    {
       "date": "2026-11-24",
       "subject": "公民",
       "range": "選修第四章"
@@ -34,20 +24,25 @@
       "date": "2026-11-20",
       "subject": "歷史",
       "range": "B1-B3"
+    },
+    {
+      "date": "2026-11-23",
+      "subject": "英文",
+      "range": "11月雜誌第二週"
+    },
+    {
+      "date": "2026-11-25",
+      "subject": "英文",
+      "range": "B5L3L4"
+    },
+    {
+      "date": "2026-11-26",
+      "subject": "英文",
+      "range": "mock"
     }
   ],
   "homework": [],
   "matters": [
-    {
-      "date": "2026-11-19",
-      "item": "學測報名資料檢核",
-      "link": "https://www.hs.ntnu.edu.tw/content?a=T0RESU1UTTVNek14T1RjPXlVRE4wa3pOeDRrVGludGVseQ==&c=T0RESU1EVTNOakl5TXpjPXdBek55SWpOeElrVGludGVseQ==&cat=T0RESTEyNTIxODAyNTk2MjI2MVRDaW50ZWx5"
-    },
-    {
-      "date": "2026-11-19",
-      "item": "術科考試報名資料檢核",
-      "link": "https://www.hs.ntnu.edu.tw/content?a=T0RESU1UTTVNek14T1RjPXlVRE4wa3pOeDRrVGludGVseQ==&c=T0RESU1EVTNOakl5TXpjPXdBek55SWpOeElrVGludGVseQ==&cat=T0RESTEyNTIxODAyNTk2MjI2MVRDaW50ZWx5"
-    },
     {
       "date": "2026-11-30",
       "item": "班費1000元繳交(月底前)",
