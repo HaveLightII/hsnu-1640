@@ -22,6 +22,7 @@ sectionFields = {
     "matters": ("date", "item", "link"),
     "links": ("label", "url", "image", "hint"),
 }
+datedSections = ("exams", "homework", "matters")
 cleanupPolicies = {"never": "不自動刪除", "beforeToday": "自動刪除（不含當日）",
                    "throughToday": "自動刪除（包含當日）"}
 fieldLabels = {"date": "日期", "subject": "科目", "range": "範圍", "item": "內容",
@@ -94,8 +95,19 @@ def loadConfig(path):
     return config
 
 
+def sortRows(config):
+    # 穩定排序：同日期保留原有先後。
+    changed = False
+    for section in datedSections:
+        sortedRows = sorted(config[section], key=lambda row: row["date"])
+        changed = changed or sortedRows != config[section]
+        config[section] = sortedRows
+    return changed
+
+
 def saveConfig(path, config):
     # 同目錄暫存後原子替換，避免寫入中斷造成半份 JSON。
+    sortRows(config)
     tempPath = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
@@ -113,18 +125,21 @@ def saveConfig(path, config):
 
 def applyCleanup(path, config):
     policy = config["cleanupPolicy"]
-    if policy == "never":
-        return
     today = date.today().isoformat()
     removed = 0
-    for section in ("exams", "homework", "matters"):
-        oldRows = config[section]
-        config[section] = [row for row in oldRows
-                           if row["date"] > today or (policy == "beforeToday" and row["date"] == today)]
-        removed += len(oldRows) - len(config[section])
-    if removed:
+    if policy != "never":
+        for section in datedSections:
+            oldRows = config[section]
+            config[section] = [row for row in oldRows
+                               if row["date"] > today or (policy == "beforeToday" and row["date"] == today)]
+            removed += len(oldRows) - len(config[section])
+    reordered = sortRows(config)
+    if removed or reordered:
         saveConfig(path, config)
+    if removed:
         print(f"已依 {cleanupPolicies[policy]} 清理 {removed} 筆資料並立即儲存")
+    if reordered:
+        print("已依日期重新排序小考、作業與事項並立即儲存")
 
 
 def initialize(path):
@@ -332,6 +347,7 @@ def changeRow(config, section, action, values, index=None):
         rows.append(row)
     else:
         rows[index] = row
+    sortRows(config)
 
 
 def setupInput():

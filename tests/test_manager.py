@@ -105,6 +105,20 @@ class ManagerTests(unittest.TestCase):
             self.assertEqual(updated['links'], config['links'])
             self.assertEqual(updated['calendar'], config['calendar'])
 
+    def testStartupSortsByDate(self):
+        config = manager.emptyConfig()
+        config['matters'] = [{'date': d, 'item': i, 'link': ''} for d, i in
+                             (('2099-03-01', 'C'), ('2099-01-01', 'A'), ('2099-03-01', 'D'), ('2099-02-01', 'B'))]
+        self.path.write_text(json.dumps(config, ensure_ascii=False), encoding='utf-8')
+        result = self.runCommand('matters', 'list')
+        self.assertIn('重新排序', result.stdout)
+        items = [row['item'] for row in manager.loadConfig(self.path)['matters']]
+        self.assertEqual(items, ['A', 'B', 'C', 'D'])
+        self.runCommand('matters', 'add', '--date', '2099-01-15', '--item', 'AB')
+        items = [row['item'] for row in manager.loadConfig(self.path)['matters']]
+        self.assertEqual(items, ['A', 'AB', 'B', 'C', 'D'])
+        self.assertNotIn('重新排序', self.runCommand('matters', 'list').stdout)
+
     def testCleanupSetAndInteractiveDiscard(self):
         self.runCommand('cleanup', 'set', 'beforeToday')
         config = manager.loadConfig(self.path)
